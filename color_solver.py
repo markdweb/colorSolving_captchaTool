@@ -53,6 +53,46 @@ def parse_message(raw_text):
     return emojis, number
 
 # -----------------------------
+# 🖱 Tooltip class
+# -----------------------------
+class CreateToolTip:
+    """
+    Tooltip for a widget that shows the actual color dynamically
+    """
+    def __init__(self, widget, default_text="Click to copy"):
+        self.widget = widget
+        self.default_text = default_text
+        self.tipwindow = None
+        self.widget.bind("<Enter>", self.show_tip)
+        self.widget.bind("<Leave>", self.hide_tip)
+
+    def show_tip(self, event=None):
+        color_text = getattr(self.widget, "color_only", "")
+        if self.tipwindow or not color_text:
+            return
+        x = self.widget.winfo_rootx() + 20
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+        self.tipwindow = tw = ctk.CTkToplevel(self.widget)
+        tw.overrideredirect(True)
+        tw.geometry(f"+{x}+{y}")
+        label = ctk.CTkLabel(
+            tw,
+            text=color_text,
+            font=("Segoe UI", 10),
+            fg_color="#333",
+            text_color="white",
+            corner_radius=5,
+            padx=5,
+            pady=2
+        )
+        label.pack()
+
+    def hide_tip(self, event=None):
+        if self.tipwindow:
+            self.tipwindow.destroy()
+        self.tipwindow = None
+
+# -----------------------------
 # 🎨 App Functions
 # -----------------------------
 def solve_color():
@@ -70,11 +110,24 @@ def solve_color():
     target = emojis[index - 1]
     color = COLOR_MAP.get(target, "Unknown")
 
+    # Show full info in label
     result_label.configure(text=f"✅ Emoji #{index} is {target} → {color}")
+
+    # Save color only for copying
+    result_label.color_only = color
+
+def copy_result(event=None):
+    if hasattr(result_label, "color_only"):
+        root.clipboard_clear()
+        root.clipboard_append(result_label.color_only)
+    # Hide tooltip immediately
+    if hasattr(result_label, "tooltip") and result_label.tooltip.tipwindow:
+        result_label.tooltip.hide_tip()
 
 def reset_input():
     input_box.delete("1.0", "end")
     result_label.configure(text="")
+    result_label.color_only = ""
 
 def toggle_mode():
     global current_mode
@@ -123,6 +176,9 @@ reset_btn.grid(row=0, column=1, padx=10)
 # Result Label
 result_label = ctk.CTkLabel(main_frame, text="", font=("Segoe UI", 14, "bold"))
 result_label.pack(pady=10)
+result_label.color_only = ""
+result_label.tooltip = CreateToolTip(result_label)
+result_label.bind("<Button-1>", copy_result)
 
 # Dark/Light Toggle Button
 mode_btn = ctk.CTkButton(main_frame, text="Switch to Light Mode", command=toggle_mode, width=200, height=35)
